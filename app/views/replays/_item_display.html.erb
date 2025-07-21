@@ -1,0 +1,66 @@
+<%
+  # Set default values for optional parameters
+  compact = local_assigns[:compact] || false
+  
+  # Determine sizing based on compact mode
+  container_class = compact ? "min-w-[80px]" : "min-w-[120px]"
+  image_class = compact ? "w-8 h-8" : "w-12 h-12"
+  text_class = compact ? "text-xs" : "text-sm"
+%>
+
+<div class="bg-gray-100 rounded-lg p-3 text-center <%= container_class %> relative group hover:bg-gray-200 transition-colors cursor-pointer"
+     data-tooltip="item-<%= item['item_id'] %>">
+  <% if item['image_url'] %>
+    <img src="<%= item['image_url'] %>" 
+         alt="<%= item['name'] %>" 
+         class="<%= image_class %> mx-auto mb-2 rounded border border-gray-300"
+         onerror="this.style.display='none'">
+  <% end %>
+  <div class="<%= text_class %> font-medium text-gray-900"><%= item['name'] %></div>
+  <% unless compact %>
+    <div class="text-xs text-gray-500 mt-1">Slot <%= item['slot'] + 1 %></div>
+  <% end %>
+  <div class="text-xs text-gray-400">ID: <%= item['item_id'] %></div>
+  
+  <!-- Detailed Tooltip -->
+  <div class="absolute bottom-full left-1/2 transform -translate-x-1/2 mb-2 px-4 py-3 bg-gray-900 text-white text-sm rounded-lg shadow-lg opacity-0 group-hover:opacity-100 transition-opacity duration-200 pointer-events-none z-50 w-80">
+    <div class="font-bold text-yellow-400 mb-2"><%= item['name'] %></div>
+    
+    <!-- Item Stats -->
+    <% if get_item_stats(item['item_id']).any? %>
+      <div class="mb-2">
+        <div class="text-green-400 font-medium mb-1">Stats:</div>
+        <% get_item_stats(item['item_id']).each do |stat| %>
+          <div class="text-xs text-gray-300">• <%= stat %></div>
+        <% end %>
+      </div>
+    <% end %>
+    
+    <!-- Item Description -->
+    <% if get_item_description(item['item_id']) %>
+      <div class="mb-2">
+        <div class="text-blue-400 font-medium mb-1">Description:</div>
+        <div class="text-xs text-gray-300 leading-relaxed"><%= get_item_description(item['item_id']) %></div>
+      </div>
+    <% end %>
+    
+    <!-- Item Cost -->
+    <% if get_item_cost(item['item_id']) %>
+      <div class="mb-2">
+        <div class="text-yellow-400 font-medium mb-1">Cost:</div>
+        <div class="text-xs text-gray-300">
+          <% if get_item_cost(item['item_id']) == 0 %>
+            Free (Trinket)
+          <% else %>
+            <%= number_with_delimiter(get_item_cost(item['item_id'])) %> gold
+          <% end %>
+        </div>
+      </div>
+    <% end %>
+    
+    <!-- Item Category -->
+    <div class="text-xs text-gray-400 border-t border-gray-700 pt-2 mt-2">
+      Category: <%= get_item_category(item['item_id']) %> | Tier: <%= get_item_tier(item['item_id']) %>
+    </div>
+  </div>
+</div>

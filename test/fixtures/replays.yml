@@ -1,0 +1,23 @@
+# Read about fixtures at https://api.rubyonrails.org/classes/ActiveRecord/FixtureSet.html
+
+one:
+  filename: MyString
+  file_path: MyString
+  file_size: 1
+  game_id: MyString
+  game_duration: 1
+  game_version: MyString
+  processed: false
+  processed_at: 2025-07-19 02:12:19
+  metadata: MyText
+
+two:
+  filename: MyString
+  file_path: MyString
+  file_size: 1
+  game_id: MyString
+  game_duration: 1
+  game_version: MyString
+  processed: false
+  processed_at: 2025-07-19 02:12:19
+  metadata: MyText

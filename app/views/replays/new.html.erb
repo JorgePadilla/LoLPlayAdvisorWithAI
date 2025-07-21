@@ -1,0 +1,76 @@
+<div class="max-w-2xl mx-auto p-6">
+  <div class="bg-white rounded-lg shadow-lg p-8">
+    <div class="text-center mb-8">
+      <h1 class="text-3xl font-bold text-gray-900 mb-2">Upload League of Legends Replay</h1>
+      <p class="text-gray-600">Upload your .rofl replay file to analyze your gameplay</p>
+    </div>
+
+    <%= form_with model: @replay, local: true, multipart: true, class: "space-y-6" do |form| %>
+      <div class="border-2 border-dashed border-gray-300 rounded-lg p-8 text-center hover:border-blue-400 transition-colors">
+        <div class="space-y-4">
+          <div class="mx-auto w-16 h-16 bg-blue-100 rounded-full flex items-center justify-center">
+            <svg class="w-8 h-8 text-blue-600" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+              <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M7 16a4 4 0 01-.88-7.903A5 5 0 1115.9 6L16 6a5 5 0 011 9.9M15 13l-3-3m0 0l-3 3m3-3v12"></path>
+            </svg>
+          </div>
+          
+          <div>
+            <label for="replay_file" class="cursor-pointer">
+              <span class="text-lg font-medium text-gray-900">Choose a .rofl file</span>
+              <span class="block text-sm text-gray-500 mt-1">or drag and drop it here</span>
+            </label>
+            <%= form.file_field :file, 
+                accept: ".rofl", 
+                required: true,
+                class: "hidden",
+                id: "replay_file",
+                onchange: "updateFileName(this)" %>
+          </div>
+          
+          <div id="file-name" class="text-sm text-gray-600 hidden">
+            <span class="font-medium">Selected file:</span> <span id="file-name-text"></span>
+          </div>
+        </div>
+      </div>
+
+      <div class="bg-blue-50 border border-blue-200 rounded-lg p-4">
+        <div class="flex items-start">
+          <div class="flex-shrink-0">
+            <svg class="w-5 h-5 text-blue-400 mt-0.5" fill="currentColor" viewBox="0 0 20 20">
+              <path fill-rule="evenodd" d="M18 10a8 8 0 11-16 0 8 8 0 0116 0zm-7-4a1 1 0 11-2 0 1 1 0 012 0zM9 9a1 1 0 000 2v3a1 1 0 001 1h1a1 1 0 100-2v-3a1 1 0 00-1-1H9z" clip-rule="evenodd"></path>
+            </svg>
+          </div>
+          <div class="ml-3">
+            <h3 class="text-sm font-medium text-blue-800">Where to find your replay files</h3>
+            <div class="mt-2 text-sm text-blue-700">
+              <p>Replay files are typically located at:</p>
+              <code class="bg-blue-100 px-2 py-1 rounded text-xs mt-1 block">
+                C:\Users\[Username]\Documents\League of Legends\Replays
+              </code>
+            </div>
+          </div>
+        </div>
+      </div>
+
+      <div class="flex justify-between items-center">
+        <%= link_to "Cancel", replays_path, class: "px-4 py-2 text-gray-600 hover:text-gray-800 transition-colors" %>
+        <%= form.submit "Upload & Analyze", 
+            class: "bg-blue-600 hover:bg-blue-700 text-white font-medium py-2 px-6 rounded-lg transition-colors cursor-pointer" %>
+      </div>
+    <% end %>
+  </div>
+</div>
+
+<script>
+  function updateFileName(input) {
+    const fileNameDiv = document.getElementById('file-name');
+    const fileNameText = document.getElementById('file-name-text');
+    
+    if (input.files && input.files[0]) {
+      fileNameText.textContent = input.files[0].name;
+      fileNameDiv.classList.remove('hidden');
+    } else {
+      fileNameDiv.classList.add('hidden');
+    }
+  }
+</script>
