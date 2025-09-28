@@ -510,6 +510,68 @@ class ReplaysController < ApplicationController
     remaining_seconds = seconds % 60
     "#{minutes}m #{remaining_seconds}s"
   end
-  
-  helper_method :format_duration, :get_item_stats, :get_item_description, :get_item_cost, :get_item_category, :get_item_tier
+
+  def extract_region_from_filename(filename)
+    return nil unless filename
+
+    # Common ROFL filename patterns:
+    # NA1-1234567890.rofl
+    # EUW1-1234567890.rofl
+    # KR-1234567890.rofl
+    # etc.
+
+    if filename =~ /^([A-Z]{2,4}[0-9]*)-([0-9]+)\.rofl$/i
+      region_code = $1
+
+      # Map region codes to full names
+      region_map = {
+        'NA1' => 'North America',
+        'EUW1' => 'Europe West',
+        'EUNE' => 'Europe Nordic & East',
+        'KR' => 'Korea',
+        'BR1' => 'Brazil',
+        'LA1' => 'Latin America North',
+        'LA2' => 'Latin America South',
+        'OC1' => 'Oceania',
+        'RU' => 'Russia',
+        'TR1' => 'Turkey',
+        'JP1' => 'Japan',
+        'PBE1' => 'Public Beta Environment'
+      }
+
+      region_map[region_code.upcase] || region_code
+    else
+      nil
+    end
+  end
+
+  def extract_patch_number(full_version)
+    return nil unless full_version && full_version != 'Unknown'
+
+    # Extract patch number from full version (e.g., "15.14.695.3589" -> "15.14")
+    version_parts = full_version.split('.')
+    if version_parts.length >= 2
+      "#{version_parts[0]}.#{version_parts[1]}"
+    else
+      nil
+    end
+  end
+
+  def extract_game_id_from_filename(filename)
+    return nil unless filename
+
+    # Common ROFL filename patterns:
+    # NA1-1234567890.rofl
+    # EUW1-1234567890.rofl
+    # KR-1234567890.rofl
+    # etc.
+
+    if filename =~ /^([A-Z]{2,4}[0-9]*)-([0-9]+)\.rofl$/i
+      $2 # Return the game ID part
+    else
+      nil
+    end
+  end
+
+  helper_method :format_duration, :get_item_stats, :get_item_description, :get_item_cost, :get_item_category, :get_item_tier, :extract_region_from_filename, :extract_patch_number, :extract_game_id_from_filename
 end

@@ -95,7 +95,7 @@ class Replay < ApplicationRecord
     if accurate_result[:success] && accurate_result[:game_info]
       # Accurate parser succeeded - use it
       accurate_result[:original_filename] = filename
-      game_info = accurate_result[:game_info]  # Use the already-parsed game_info
+      game_info = AccurateRoflParser.extract_game_info(accurate_result)  # Extract complete game info
       result = accurate_result
     else
       # Try enhanced parser as fallback

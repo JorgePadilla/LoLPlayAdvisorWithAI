@@ -54,28 +54,32 @@ class BasicRoflHandler
   
   def self.extract_game_info(parsed_data)
     return {} unless parsed_data[:success]
-    
+
     # Extract basic info from filename and file metadata
     # Use the original filename if available, otherwise fall back to stored name
     filename = parsed_data[:original_filename] || parsed_data[:file_info][:name]
-    
+
     # Try to extract region and game ID from filename (e.g., "LA1-1635295663.rofl")
     region = nil
     game_id_from_filename = nil
-    
+
     if filename =~ /^([A-Z0-9]+)-([0-9]+)\.rofl$/i
       region = $1
       game_id_from_filename = $2
     end
-    
+
     # Get file creation time as approximate game time
     file_path = parsed_data[:file_info][:full_path] || parsed_data[:file_info][:name]
     file_time = File.mtime(file_path) rescue Time.current
-    
+
+    game_version = extract_version_from_rofl(file_path)
+    patch_number = extract_patch_number(game_version)
+
     {
       game_id: game_id_from_filename || "rofl_#{SecureRandom.hex(8)}",
       game_duration: nil, # Would need to parse binary data
-      game_version: extract_version_from_rofl(file_path),
+      game_version: game_version,
+      patch_number: patch_number,
       game_mode: "Classic", # Default assumption
       map_id: 11, # Summoner's Rift default
       queue_id: 420, # Ranked Solo/Duo default
@@ -125,5 +129,16 @@ class BasicRoflHandler
 
   def self.extract_team_info(metadata)
     []
+  end
+
+  def self.extract_patch_number(game_version)
+    # Extract patch number from full version (e.g., "15.14.695.3589" -> "15.14")
+    if game_version && game_version != "Unknown"
+      version_parts = game_version.split('.')
+      if version_parts.length >= 2
+        return "#{version_parts[0]}.#{version_parts[1]}"
+      end
+    end
+    "Unknown"
   end
 end

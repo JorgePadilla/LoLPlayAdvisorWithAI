@@ -94,8 +94,8 @@ class ItemBuildAnalyzer
   def calculate_build_efficiency
     final_items = @game_info['items'] || []
     total_cost = final_items.sum { |item| get_item_total_cost(item['item_id']) }
-    
-    # Calculate efficiency metrics
+
+    # Calculate efficiency metrics - ensure they're out of 10, not percentages
     {
       total_gold_spent: total_cost,
       gold_efficiency: calculate_gold_efficiency(final_items),
@@ -103,6 +103,10 @@ class ItemBuildAnalyzer
       adaptation_score: calculate_adaptation_score,
       overall_score: 0 # Will be calculated based on sub-scores
     }.tap do |scores|
+      # Convert all scores to be out of 10
+      scores[:gold_efficiency] = scores[:gold_efficiency] / 10.0
+      scores[:timing_score] = scores[:timing_score] / 10.0
+      scores[:adaptation_score] = scores[:adaptation_score] / 10.0
       scores[:overall_score] = (scores[:gold_efficiency] + scores[:timing_score] + scores[:adaptation_score]) / 3
     end
   end

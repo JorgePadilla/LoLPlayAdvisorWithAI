@@ -125,10 +125,28 @@ class EnhancedRoflParser
     # Find the current player (usually the first one or marked somehow)
     current_player = participants.first
     
+    # Try multiple methods to extract version
+    version_from_metadata = extract_version_from_metadata(metadata)
+    version_from_file = extract_version_from_rofl(parsed_data[:file_info][:full_path])
+
+    # Use metadata version first, then file extraction
+    if version_from_metadata && version_from_metadata[:full_version] != "Unknown"
+      version_info = version_from_metadata
+    else
+      version_info = version_from_file
+    end
+
+    # If all methods fail, use current patch as reasonable estimate
+    if version_info[:full_version] == "Unknown"
+      current_version = get_current_league_version
+      version_info = { full_version: current_version, patch_number: extract_patch_number(current_version) }
+    end
+
     {
       game_id: game_id_from_filename || metadata&.dig('gameId')&.to_s || "rofl_#{SecureRandom.hex(8)}",
       game_duration: game_length ? (game_length / 1000.0).round : nil, # Convert ms to seconds
-      game_version: extract_version_from_rofl(parsed_data[:file_info][:full_path]),
+      game_version: version_info[:full_version],
+      patch_number: version_info[:patch_number],
       game_mode: metadata&.dig('gameMode') || "Classic",
       map_id: metadata&.dig('mapId') || 11,
       queue_id: metadata&.dig('queueId') || 420,
@@ -146,24 +164,86 @@ class EnhancedRoflParser
   def self.extract_version_from_rofl(file_path)
     begin
       File.open(file_path, 'rb') do |file|
-        file.seek(6)
-        data_chunk = file.read(200)
-        return "Unknown" if data_chunk.nil?
-        
-        data_str = data_chunk.force_encoding('UTF-8').encode('UTF-8', invalid: :replace, undef: :replace)
-        version_match = data_str.match(/(\d+\.\d+\.\d+\.\d+)/)
-        return version_match[1] if version_match
-        
-        if data_chunk.include?('.')
-          ascii_parts = data_chunk.scan(/[\d.]+/).select { |s| s.match?(/\d+\.\d+\.\d+\.\d+/) }
-          return ascii_parts.first if ascii_parts.any?
+        # Read the entire file content to search for version
+        file_content = file.read
+
+        # Look for version patterns in the entire file
+        # ROFL files typically store version in specific formats
+
+        # Pattern 1: Standard version format (e.g., 15.14.695.3589)
+        version_match = file_content.match(/(\d+\.\d+\.\d+\.\d+)/)
+        if version_match
+          full_version = version_match[1]
+          patch_number = extract_patch_number(full_version)
+          return { full_version: full_version, patch_number: patch_number }
         end
-        
-        return "Unknown"
+
+        # Pattern 2: Three-part version (e.g., 15.14.695)
+        version_match = file_content.match(/(\d+\.\d+\.\d+)/)
+        if version_match
+          full_version = version_match[1]
+          patch_number = extract_patch_number(full_version)
+          return { full_version: full_version, patch_number: patch_number }
+        end
+
+        # Pattern 3: GameVersion prefix
+        version_match = file_content.match(/GameVersion-([\d.]+)/)
+        if version_match
+          full_version = version_match[1]
+          patch_number = extract_patch_number(full_version)
+          return { full_version: full_version, patch_number: patch_number }
+        end
+
+        # Pattern 4: Look for version in JSON metadata if present
+        json_match = file_content.match(/\"gameVersion\":\s*\"([\d.]+)\"/)
+        if json_match
+          full_version = json_match[1]
+          patch_number = extract_patch_number(full_version)
+          return { full_version: full_version, patch_number: patch_number }
+        end
+
+        return { full_version: "Unknown", patch_number: "Unknown" }
       end
-    rescue
-      "Unknown"
+    rescue => e
+      Rails.logger.error "Error extracting version from ROFL: #{e.message}"
+      { full_version: "Unknown", patch_number: "Unknown" }
     end
+  end
+
+  def self.extract_version_from_metadata(metadata)
+    # Try to extract version from metadata if available
+    return { full_version: "Unknown", patch_number: "Unknown" } unless metadata
+
+    # Check various possible version fields in metadata
+    version_fields = ['gameVersion', 'version', 'matchVersion', 'clientVersion']
+
+    version_fields.each do |field|
+      version = metadata[field]
+      if version && version.match?(/\d+\.\d+(\.\d+)*/)
+        patch_number = extract_patch_number(version)
+        return { full_version: version, patch_number: patch_number }
+      end
+    end
+
+    { full_version: "Unknown", patch_number: "Unknown" }
+  end
+
+  def self.get_current_league_version
+    # You could fetch this dynamically from Riot's API:
+    # https://ddragon.leagueoflegends.com/api/versions.json
+    # For now, using a recent version
+    "15.14.1" # Update this when new patches release
+  end
+
+  def self.extract_patch_number(full_version)
+    # Extract patch number from full version (e.g., "15.14.695.3589" -> "15.14")
+    if full_version && full_version != "Unknown"
+      version_parts = full_version.split('.')
+      if version_parts.length >= 2
+        return "#{version_parts[0]}.#{version_parts[1]}"
+      end
+    end
+    "Unknown"
   end
 
   def self.extract_player_info(participant)

@@ -163,13 +163,16 @@ class RoflParser
 
   def self.extract_game_info(parsed_data)
     return {} unless parsed_data[:success] && parsed_data[:metadata]
-    
+
     metadata = parsed_data[:metadata]
-    
+    game_version = metadata['gameVersion']
+    patch_number = extract_patch_number(game_version)
+
     {
       game_id: metadata['gameId'] || metadata['matchId'],
       game_duration: metadata['gameDuration'] || metadata['gameLength'],
-      game_version: metadata['gameVersion'],
+      game_version: game_version,
+      patch_number: patch_number,
       game_mode: metadata['gameMode'],
       map_id: metadata['mapId'],
       queue_id: metadata['queueId'],
@@ -215,5 +218,16 @@ class RoflParser
         baron_kills: team['baronKills']
       }
     end
+  end
+
+  def self.extract_patch_number(game_version)
+    # Extract patch number from full version (e.g., "15.14.695.3589" -> "15.14")
+    if game_version && game_version != "Unknown"
+      version_parts = game_version.split('.')
+      if version_parts.length >= 2
+        return "#{version_parts[0]}.#{version_parts[1]}"
+      end
+    end
+    "Unknown"
   end
 end

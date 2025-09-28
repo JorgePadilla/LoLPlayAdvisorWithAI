@@ -502,11 +502,22 @@ class AccurateRoflParser
     # Extract precise game duration from TIME_PLAYED (in seconds)
     time_played = metadata['TIME_PLAYED']&.to_i
     
+    # Extract version information - try multiple methods
+    game_version = metadata['GAME_VERSION'] || extract_version_from_metadata(metadata) || extract_version_from_rofl(parsed_data[:file_info][:full_path])
+
+    # If all methods fail, use current patch as reasonable estimate
+    if game_version == "Unknown" || game_version.nil?
+      game_version = get_current_league_version
+    end
+
+    patch_number = extract_patch_number(game_version)
+
     # Extract other detailed game information
     {
       game_id: game_id_from_filename || metadata['ID'] || "rofl_#{SecureRandom.hex(8)}",
       game_duration: time_played, # Exact duration in seconds
-      game_version: metadata['GAME_VERSION'] || extract_version_from_filename(parsed_data[:file_info][:name]),
+      game_version: game_version,
+      patch_number: patch_number,
       game_mode: metadata['GAME_MODE'] || determine_game_mode(metadata),
       map_id: 11, # Summoner's Rift
       queue_id: metadata['QUEUE_ID']&.to_i || determine_queue_type(metadata),
@@ -535,18 +546,76 @@ class AccurateRoflParser
 
   private
 
+  def self.extract_version_from_rofl(file_path)
+    begin
+      File.open(file_path, 'rb') do |file|
+        # Read the entire file content to search for version
+        file_content = file.read
+
+        # Look for version patterns in the entire file
+        # ROFL files typically store version in specific formats
+
+        # Pattern 1: Standard version format (e.g., 15.14.695.3589)
+        version_match = file_content.match(/(\d+\.\d+\.\d+\.\d+)/)
+        return version_match[1] if version_match
+
+        # Pattern 2: Three-part version (e.g., 15.14.695)
+        version_match = file_content.match(/(\d+\.\d+\.\d+)/)
+        return version_match[1] if version_match
+
+        # Pattern 3: GameVersion prefix
+        version_match = file_content.match(/GameVersion-([\d.]+)/)
+        return version_match[1] if version_match
+
+        # Pattern 4: Look for version in JSON metadata if present
+        json_match = file_content.match(/\"gameVersion\":\s*\"([\d.]+)\"/)
+        return json_match[1] if json_match
+
+        return "Unknown"
+      end
+    rescue => e
+      Rails.logger.error "Error extracting version from ROFL: #{e.message}"
+      "Unknown"
+    end
+  end
+
+  def self.extract_version_from_metadata(metadata)
+    # Try to extract version from metadata if available
+    return nil unless metadata
+
+    # Check various possible version fields in metadata
+    version_fields = ['GAME_VERSION', 'gameVersion', 'version', 'matchVersion', 'clientVersion']
+
+    version_fields.each do |field|
+      version = metadata[field]
+      return version if version && version.match?(/\d+\.\d+(\.\d+)*/)
+    end
+
+    nil
+  end
+
   def self.extract_version_from_filename(filename)
-    # ROFL files don't store version in the JSON metadata
-    # Version is in the binary header which is complex to parse
-    # Using current patch version as reasonable default
+    # Try to extract from ROFL file first, fallback to current version
+    # This method is kept for backward compatibility
     get_current_league_version
+  end
+
+  def self.extract_patch_number(full_version)
+    # Extract patch number from full version (e.g., "15.14.695.3589" -> "15.14")
+    if full_version && full_version != "Unknown"
+      version_parts = full_version.split('.')
+      if version_parts.length >= 2
+        return "#{version_parts[0]}.#{version_parts[1]}"
+      end
+    end
+    "Unknown"
   end
   
   def self.get_current_league_version
     # You could fetch this dynamically from Riot's API:
     # https://ddragon.leagueoflegends.com/api/versions.json
     # For now, using a recent version
-    "15.1.1" # Update this when new patches release
+    "15.14.1" # Update this when new patches release
   end
 
   def self.determine_game_mode(metadata)
@@ -638,7 +707,56 @@ class AccurateRoflParser
     # Riot's Data Dragon CDN for champion images
     # Using the latest version - you could make this dynamic by fetching versions.json
     version = "15.14.1" # Update this periodically or fetch dynamically
-    "https://ddragon.leagueoflegends.com/cdn/#{version}/img/champion/#{champion_name}.png"
+
+    # Handle champion name variations and special cases
+    normalized_name = normalize_champion_name(champion_name)
+
+    "https://ddragon.leagueoflegends.com/cdn/#{version}/img/champion/#{normalized_name}.png"
+  end
+
+  def self.normalize_champion_name(champion_name)
+    return 'Unknown' if champion_name.nil? || champion_name.empty?
+
+    # Champion name mappings for Data Dragon compatibility
+    # Data Dragon uses specific naming conventions that may differ from ROFL files
+    champion_mappings = {
+      # Champions with special naming in Data Dragon
+      'Fiddlesticks' => 'Fiddlesticks',
+      'FiddleSticks' => 'Fiddlesticks',
+      'DrMundo' => 'DrMundo',
+      'LeeSin' => 'LeeSin',
+      'MissFortune' => 'MissFortune',
+      'TwistedFate' => 'TwistedFate',
+      'XinZhao' => 'XinZhao',
+      'MasterYi' => 'MasterYi',
+      'KogMaw' => 'KogMaw',
+      'KhaZix' => 'KhaZix',
+      'ChoGath' => 'ChoGath',
+      'RekSai' => 'RekSai',
+      'VelKoz' => 'VelKoz',
+      'KaiSa' => 'Kaisa',
+      'BelVeth' => 'Belveth',
+      'Nunu' => 'Nunu',
+      'Wukong' => 'MonkeyKing',
+      'MonkeyKing' => 'MonkeyKing'
+    }
+
+    # Check if we have a specific mapping
+    if champion_mappings.key?(champion_name)
+      return champion_mappings[champion_name]
+    end
+
+    # For other champions, try to normalize the name
+    # Remove spaces and special characters, capitalize appropriately
+    normalized = champion_name.gsub(/[^a-zA-Z0-9]/, '')
+
+    # Special case: if the name starts with lowercase, it might already be in Data Dragon format
+    if normalized.match?(/^[a-z]/)
+      return normalized
+    end
+
+    # Default: use the name as-is (Data Dragon typically uses PascalCase)
+    normalized
   end
   
   def self.get_item_image_url(item_id)
